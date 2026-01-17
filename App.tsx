@@ -3,6 +3,7 @@ import AgentCard from './components/AgentCard';
 import ProtocolLog from './components/ProtocolLog';
 import { AgentRole, FheValue, EncryptionState, LogEntry, ScenarioStep, PatientVitals } from './types';
 import * as FheSim from './services/fheSimulation';
+import * as Cohere from './services/cohereService';
 import { Activity, Shield, RotateCcw, FileJson, X, Building2 } from 'lucide-react';
 
 // --- OPERATION CONFIGURATION ---
@@ -166,16 +167,26 @@ export default function App() {
     else if (source === AgentRole.GENERAL_DOCTOR) {
         if (!dataGenDoc) return;
         if (action === 'DELEGATE' && target) {
-            setStatus(source, `Referral to ${target}...`);
-            setTimeout(() => {
-                if (target === AgentRole.SPECIALIST) { setDataSpecialist(dataGenDoc); setStatus(AgentRole.SPECIALIST, "Referral Received"); }
-                if (target === AgentRole.MEDICAL_LAB) { setDataLab(dataGenDoc); setStatus(AgentRole.MEDICAL_LAB, "Sample Received"); }
-                if (target === AgentRole.BILLING) { setDataBilling(dataGenDoc); setStatus(AgentRole.BILLING, "Order Received"); }
-                
-                setDataGenDoc(null);
-                addLog(source, 'REFERRAL', `Referring patient case to ${target}. Data remains encrypted.`);
-                setStatus(source, "Referred");
-            }, 800);
+            setStatus(source, `Generating Bill & Referral to ${target}...`);
+            
+            // Generate bill from Cohere
+            const vitals = dataGenDoc.rawValue as PatientVitals;
+            Cohere.generateGeneralDoctorBill(vitals).then((cohereResult) => {
+                setTimeout(() => {
+                    const updatedData = {
+                        ...dataGenDoc,
+                        bills: { ...(dataGenDoc.bills || {}), 'General Doctor': cohereResult.bill }
+                    };
+                    
+                    if (target === AgentRole.SPECIALIST) { setDataSpecialist(updatedData); setStatus(AgentRole.SPECIALIST, "Referral Received"); }
+                    if (target === AgentRole.MEDICAL_LAB) { setDataLab(updatedData); setStatus(AgentRole.MEDICAL_LAB, "Sample Received"); }
+                    if (target === AgentRole.BILLING) { setDataBilling(updatedData); setStatus(AgentRole.BILLING, "Order Received"); }
+                    
+                    setDataGenDoc(null);
+                    addLog(source, 'REFERRAL', `Referring patient case to ${target}. Data remains encrypted.`);
+                    setStatus(source, "Referred");
+                }, 800);
+            });
         }
     }
 
@@ -183,15 +194,23 @@ export default function App() {
     else if (source === AgentRole.MEDICAL_LAB) {
         if (!dataLab) return;
         if (action === 'INFERENCE') {
-             setStatus(source, "Analyzing Samples...");
-             setTimeout(() => {
-                 const op = FheSim.homomorphicLabAnalysis(dataLab);
-                 setDataLab(op.value);
-                 addLog(source, 'LAB_WORK', op.logDetails, op.metrics, op.mathFormula);
-                 setStatus(source, "Analysis Done");
-             }, 1500);
+             setStatus(source, "Analyzing Biomarkers & Generating Bill...");
+             const vitals = dataLab.rawValue as PatientVitals;
+             
+             Cohere.generateLabAnalysisBiomarkers(vitals).then((cohereResult) => {
+                 setTimeout(() => {
+                     const op = FheSim.homomorphicLabAnalysis(dataLab);
+                     const updatedValue = {
+                         ...op.value,
+                         bills: { ...(op.value.bills || {}), 'Medical Lab': cohereResult.bill }
+                     };
+                     setDataLab({ ...updatedValue });
+                     addLog(source, 'LAB_WORK', op.logDetails, { ...op.metrics, biomarkers: JSON.stringify(cohereResult.biomarkers) }, op.mathFormula);
+                     setStatus(source, "Analysis Done");
+                 }, 1500);
+             });
         } else if (action === 'DELEGATE' && target === AgentRole.SPECIALIST) {
-             setStatus(source, "Sending Results...");
+             setStatus(source, "Sending Results to Specialist...");
              setTimeout(() => {
                  setDataSpecialist(dataLab);
                  setDataLab(null);
@@ -206,13 +225,22 @@ export default function App() {
     else if (source === AgentRole.SPECIALIST) {
         if (!dataSpecialist) return;
         if (action === 'INFERENCE') {
-            setStatus(source, "Diagnosing...");
-            setTimeout(() => {
-                const op = FheSim.homomorphicDiagnosis(dataSpecialist);
-                setDataSpecialist(op.value);
-                addLog(source, 'DIAGNOSIS', op.logDetails, op.metrics, op.mathFormula);
-                setStatus(source, "Diagnosis Ready");
-            }, 2000);
+            setStatus(source, "Diagnosing & Generating Bill...");
+            const vitals = dataSpecialist.rawValue as PatientVitals;
+            
+            Cohere.generateSpecialistDiagnosis(vitals).then((cohereResult) => {
+                setTimeout(() => {
+                    const op = FheSim.homomorphicDiagnosis(dataSpecialist);
+                    const updatedValue = {
+                        ...op.value,
+                        bills: { ...(op.value.bills || {}), 'Specialist': cohereResult.bill },
+                        severity: cohereResult.severity
+                    };
+                    setDataSpecialist({ ...updatedValue });
+                    addLog(source, 'DIAGNOSIS', op.logDetails, { ...op.metrics, severity: cohereResult.severity }, op.mathFormula);
+                    setStatus(source, "Diagnosis Ready");
+                }, 2000);
+            });
         } else if (action === 'DELEGATE' && target === AgentRole.HUMAN_DOCTOR) {
             setStatus(source, "Requesting Approval...");
             setTimeout(() => {
@@ -229,22 +257,32 @@ export default function App() {
     else if (source === AgentRole.HUMAN_DOCTOR) {
         if (!dataHumanDoc) return;
         if (action === 'INFERENCE') { // Review & Approve
-            setStatus(source, "Reviewing...");
-            setTimeout(() => {
-                const op = FheSim.humanDoctorReview(dataHumanDoc);
-                setDataHumanDoc(op.value);
-                addLog(source, 'APPROVAL', op.logDetails, op.metrics, op.mathFormula);
-                
-                // Auto send back to patient after approval
+            setStatus(source, "Reviewing & Generating Final Bill...");
+            const vitals = dataHumanDoc.rawValue as PatientVitals;
+            const currentSeverity = dataHumanDoc.severity || 65;
+            
+            Cohere.generateHumanDoctorReview(vitals, currentSeverity).then((cohereResult) => {
                 setTimeout(() => {
-                    setDataPatient(op.value); // Return the FheValue inside the result
-                    setDataHumanDoc(null);
-                    addLog(source, 'DISCHARGE', 'Approved results returned to Patient.');
-                    setStatus(AgentRole.PATIENT, "Results Available");
-                    setStatus(source, "Signed Off");
-                }, 1000);
+                    const op = FheSim.humanDoctorReview(dataHumanDoc);
+                    const updatedValue = {
+                        ...op.value,
+                        bills: { ...(op.value.bills || {}), 'Human Doctor': cohereResult.bill },
+                        severity: cohereResult.finalSeverity
+                    };
+                    setDataHumanDoc({ ...updatedValue });
+                    addLog(source, 'APPROVAL', op.logDetails, { ...op.metrics, severity: cohereResult.finalSeverity }, op.mathFormula);
+                    setStatus(source, "Approved");
+                    
+                    // Send to Billing after approval
+                    setTimeout(() => {
+                        setDataBilling(updatedValue);
+                        setDataHumanDoc(null);
+                        addLog(source, 'FORWARD_BILLING', 'Forwarding approved case to Billing for cost calculation.');
+                        setStatus(AgentRole.BILLING, "Processing Payment...");
+                    }, 1000);
 
-            }, 1500);
+                }, 1500);
+            });
         }
     }
 
@@ -252,12 +290,34 @@ export default function App() {
     else if (source === AgentRole.BILLING) {
         if (!dataBilling) return;
         if (action === 'INFERENCE') {
-             setStatus(source, "Calculating...");
+             setStatus(source, "Generating Final Invoice...");
              setTimeout(() => {
                  const op = FheSim.homomorphicBilling(dataBilling);
-                 setDataBilling(op.value);
+                 
+                 // Calculate total bill
+                 const allBills = dataBilling.bills || {};
+                 const totalBill = Object.values(allBills).reduce((sum: number, bill: any) => sum + (typeof bill === 'number' ? bill : 0), 0);
+                 
+                 const updatedValue = {
+                     ...op.value,
+                     bills: allBills,
+                     totalBill: totalBill
+                 };
+                 
+                 console.log('[BILLING-INVOICE]', { allBills, totalBill });
+                 
+                 setDataBilling({ ...updatedValue });
                  addLog(source, 'BILLING', op.logDetails, op.metrics, op.mathFormula);
                  setStatus(source, "Invoiced");
+                 
+                 // Return to Patient after billing
+                 setTimeout(() => {
+                     setDataPatient({ ...updatedValue });
+                     setDataBilling(null);
+                     addLog(source, 'COMPLETE', `Complete patient case with final billing. Returning to Patient.`);
+                     setStatus(AgentRole.PATIENT, "Results Available");
+                     setStatus(source, "Done");
+                 }, 800);
              }, 1200);
         }
     }

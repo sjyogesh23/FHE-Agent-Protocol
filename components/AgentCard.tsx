@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AgentRole, FheValue, EncryptionState, ScenarioStep, PatientVitals } from '../types';
-import { Lock, Unlock, Server, Laptop, Cpu, ShieldCheck, ChevronRight, FileJson, Bot, Network, Microscope, FileCheck, Stethoscope, TestTube, Receipt, UserCheck, Activity } from 'lucide-react';
+import { Lock, Unlock, Server, Laptop, Cpu, ShieldCheck, ChevronRight, FileJson, Bot, Network, Microscope, FileCheck, Stethoscope, TestTube, Receipt, UserCheck, Activity, ChevronDown } from 'lucide-react';
 import EncryptionVisualizer from './EncryptionVisualizer';
 
 interface AgentCardProps {
@@ -16,6 +16,7 @@ interface AgentCardProps {
 }
 
 const AgentCard: React.FC<AgentCardProps> = ({ role, data, isProcessing, onAction, statusMessage, availableOperations, scenarioName, onViewManifest, onUpdateData }) => {
+  const [showInvoice, setShowInvoice] = useState(false);
   const isPatient = role === AgentRole.PATIENT;
 
   const getVisualizerLabel = () => {
@@ -252,7 +253,7 @@ const AgentCard: React.FC<AgentCardProps> = ({ role, data, isProcessing, onActio
                     ) : (
                         // Otherwise use the visualizer
                         <EncryptionVisualizer 
-                            value={data.rawValue} 
+                            value={data.state === EncryptionState.DECRYPTED && data.severity !== undefined ? data.severity : data.rawValue} 
                             state={data.state}
                             maxValue={100} 
                             label={getVisualizerLabel()}
@@ -314,6 +315,37 @@ const AgentCard: React.FC<AgentCardProps> = ({ role, data, isProcessing, onActio
                                 <Unlock size={12} className="group-hover:scale-110 transition-transform" />
                                 {data.state === EncryptionState.PROCESSED ? 'Decrypt Results' : 'Decrypt (Verify)'}
                             </button>
+                        )}
+
+                        {/* Invoice Expandable - After Decryption with Bills */}
+                        {data.state === EncryptionState.DECRYPTED && data.bills && Object.keys(data.bills).length > 0 && (
+                            <div className="bg-neutral-900 border border-neutral-700 rounded-lg overflow-hidden">
+                                <button 
+                                    onClick={() => setShowInvoice(!showInvoice)}
+                                    className="w-full p-3 flex items-center justify-between hover:bg-neutral-800 transition-colors text-xs text-neutral-300 font-mono uppercase tracking-wider"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <Receipt size={14} className="text-teal-400" />
+                                        Invoice Breakdown
+                                    </div>
+                                    <ChevronDown size={14} className={`transition-transform ${showInvoice ? 'rotate-180' : ''}`} />
+                                </button>
+                                
+                                {showInvoice && (
+                                    <div className="bg-neutral-950 border-t border-neutral-700 p-3 space-y-2 text-[9px] font-mono text-neutral-300">
+                                        {Object.entries(data.bills).map(([agent, bill]) => (
+                                            <div key={agent} className="flex justify-between items-center p-2 bg-neutral-900/50 rounded border border-neutral-800">
+                                                <span className="text-neutral-400">{agent}</span>
+                                                <span className="text-teal-400 font-bold">${typeof bill === 'number' ? bill : 0}</span>
+                                            </div>
+                                        ))}
+                                        <div className="border-t border-neutral-800 pt-2 mt-2 flex justify-between items-center p-2 bg-neutral-900 rounded font-bold">
+                                            <span className="text-white">TOTAL</span>
+                                            <span className="text-green-400 text-sm">${data.totalBill || 0}</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         )}
                      </div>
                  )}

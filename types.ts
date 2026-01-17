@@ -41,6 +41,9 @@ export interface FheValue {
   encryptedBlob: string;
   state: EncryptionState;
   history: string[];
+  bills?: Record<string, number>; // Agent -> Bill mapping
+  totalBill?: number;
+  severity?: number;
 }
 
 export interface SimulatedOpResult {
