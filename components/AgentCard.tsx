@@ -281,7 +281,7 @@ const AgentCard: React.FC<AgentCardProps> = ({ role, data, isProcessing, onActio
                             <div className="text-[10px] text-neutral-500 text-center mb-2">Process Complete</div>
                         )}
                         
-                        {role !== AgentRole.HUMAN_DOCTOR && role !== AgentRole.GENERAL_DOCTOR && (
+                        {role !== AgentRole.HUMAN_DOCTOR && role !== AgentRole.GENERAL_DOCTOR && role !== AgentRole.BILLING && (
                              <button onClick={() => onAction?.('SEND_BACK')} className="mt-1 p-2 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 rounded text-[10px] font-mono text-white transition-colors flex items-center justify-center gap-2">
                                 Return to Hospital Net
                             </button>

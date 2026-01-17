@@ -259,11 +259,6 @@ export default function App() {
                  addLog(source, 'BILLING', op.logDetails, op.metrics, op.mathFormula);
                  setStatus(source, "Invoiced");
              }, 1200);
-        } else if (action === 'SEND_BACK') {
-            setDataPatient(dataBilling);
-            setDataBilling(null);
-            addLog(source, 'INVOICE', 'Sending encrypted invoice to Patient.');
-            setStatus(AgentRole.PATIENT, "Bill Received");
         }
     }
   };
@@ -304,12 +299,12 @@ export default function App() {
                 <Shield size={20} className="text-white" />
             </div>
             <div>
-                <h1 className="font-bold text-white tracking-tight">ST. ZAMA <span className="text-emerald-500">HOSPITAL</span></h1>
+                <h1 className="font-bold text-white tracking-tight">HELL YEAH <span className="text-emerald-500">HOSPITAL</span></h1>
                 <p className="text-[10px] text-neutral-400 font-mono tracking-widest">ENCRYPTED HEALTHCARE PROTOCOL</p>
             </div>
           </div>
           <div className="flex items-center gap-6">
-              <button 
+              <button   
                 onClick={resetState}
                 className="flex items-center gap-2 px-3 py-1 bg-neutral-800 hover:bg-neutral-700 rounded text-xs text-neutral-400 transition-colors border border-neutral-700"
               >
