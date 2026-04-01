@@ -359,7 +359,7 @@ export default function App() {
                 <Shield size={20} className="text-white" />
             </div>
             <div>
-                <h1 className="font-bold text-white tracking-tight">HELL YEAH <span className="text-emerald-500">HOSPITAL</span></h1>
+                <h1 className="font-bold text-white tracking-tight">HEALTHY <span className="text-emerald-500">HOSPITAL</span></h1>
                 <p className="text-[10px] text-neutral-400 font-mono tracking-widest">ENCRYPTED HEALTHCARE PROTOCOL</p>
             </div>
           </div>
